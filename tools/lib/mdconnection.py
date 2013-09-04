@@ -38,28 +38,3 @@ class MDConnection(object):
 
     def read(self):
         return Datagram(self._read())
-
-    def expect(self, datagram):
-        return self.expect_multi([datagram], only=True)
-
-    def expect_multi(self, datagrams, only=False):
-        datagrams = list(datagrams) # We're going to be doing datagrams.remove()
-
-        while datagrams:
-            dg = self._read()
-            if dg is None: return False # Augh, we didn't see all the dgs yet!
-            dg = Datagram(dg)
-
-            for datagram in datagrams:
-                if datagram.is_subset_of(dg):
-                    datagrams.remove(datagram)
-                    break
-            else:
-                if only:
-                    return False
-
-        return True
-
-
-    def expect_none(self):
-        return self._read() == None
