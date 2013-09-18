@@ -5,6 +5,7 @@
 
 #include "global.h"
 #include "RoleFactory.h"
+#include "util/EventSender.h"
 
 LogCategory mainlog("main", "Main");
 
@@ -24,7 +25,7 @@ int main(int argc, char *argv[])
 		cfg_file = "openotpd.yml";
 		for (int i = 1; i < argc; i++)
 		{
-			if (strcmp(argv[i],  "-config") == 0 && i + 1 < argc) 
+			if (strcmp(argv[i],  "-config") == 0 && i + 1 < argc)
 			{
 				cfg_file = argv[++i];
 			}
@@ -64,6 +65,7 @@ int main(int argc, char *argv[])
 	}
 
 	MessageDirector::singleton.init_network();
+	g_eventsender.init();
 
 	YAML::Node node = gConfig->copy_node();
 	node = node["roles"];

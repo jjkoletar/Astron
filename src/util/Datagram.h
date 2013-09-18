@@ -31,6 +31,11 @@ public:
 		memcpy(buf, data.c_str(), data.length());
 	}
 
+	Datagram(const char *data, size_t length) : buf(new char[length]), buf_size(length), buf_end(length)
+	{
+		memcpy(buf, data, length);
+	}
+
 	Datagram(unsigned long long to_channel, unsigned long long from_channel, unsigned short message_type) : buf(new char[64]), buf_size(64), buf_end(0)
 	{
 		add_server_header(to_channel, from_channel, message_type);
@@ -99,20 +104,20 @@ public:
 		add_data(str);
 	}
 
-	void add_server_header(unsigned long long to_channel, unsigned long long from_channel, unsigned short message_type)
+	void add_server_header(channel_t to, channel_t from, unsigned short message_type)
 	{
 		add_uint8(1);
-		add_uint64(to_channel);
-		add_uint64(from_channel);
+		add_uint64(to);
+		add_uint64(from);
 		add_uint16(message_type);
 	}
 
-	void add_server_header(const std::set<unsigned long long> &to_channels, unsigned long long from_channel, unsigned short message_type)
+	void add_server_header(const std::set<channel_t> &to, channel_t from, unsigned short message_type)
 	{
-		add_uint8(to_channels.size());
-		for(auto it = to_channels.begin(); it != to_channels.end(); ++it)
+		add_uint8(to.size());
+		for(auto it = to.begin(); it != to.end(); ++it)
 			add_uint64(*it);
-		add_uint64(from_channel);
+		add_uint64(from);
 		add_uint16(message_type);
 	}
 
@@ -123,12 +128,12 @@ public:
 		add_uint16(message_type);
 	}
 
-	unsigned int get_buf_end()
+	unsigned int get_buf_end() const
 	{
 		return buf_end;
 	}
 
-	const char* get_data()
+	char* get_data() const
 	{
 		return buf;
 	}
