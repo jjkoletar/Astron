@@ -48,7 +48,7 @@ void MessageDirector::init_network()
 		{
 			m_log.info() << "Opening listening socket..." << std::endl;
 			std::string str_ip = bind_addr.get_val();
-			std::string str_port = str_ip.substr(str_ip.find(':', 0)+1, std::string::npos);
+			std::string str_port = str_ip.substr(str_ip.find(':', 0) + 1, std::string::npos);
 			str_ip = str_ip.substr(0, str_ip.find(':', 0));
 			tcp::resolver resolver(io_service);
 			tcp::resolver::query query(str_ip, str_port);
@@ -62,7 +62,7 @@ void MessageDirector::init_network()
 		{
 			m_log.info() << "Connecting upstream..." << std::endl;
 			std::string str_ip = connect_addr.get_val();
-			std::string str_port = str_ip.substr(str_ip.find(':', 0)+1, std::string::npos);
+			std::string str_port = str_ip.substr(str_ip.find(':', 0) + 1, std::string::npos);
 			str_ip = str_ip.substr(0, str_ip.find(':', 0));
 			tcp::resolver resolver(io_service);
 			tcp::resolver::query query(str_ip, str_port);
@@ -88,40 +88,61 @@ void MessageDirector::init_network()
 void MessageDirector::handle_datagram(MDParticipantInterface *p, Datagram &dg)
 {
 	m_log.spam() << "Processing datagram...." << std::endl;
+
+	uint8_t channels = 0;
 	DatagramIterator dgi(dg);
-	unsigned char channels = dgi.read_uint8();
-
-	// Route messages to participants
-	auto &recieve_log = m_log.spam();
-	recieve_log << "Recievers: ";
 	std::set<MDParticipantInterface*> receiving_participants;
-	for(unsigned char i = 0; i < channels; ++i)
+	try
 	{
-		channel_t channel = dgi.read_uint64();
-		recieve_log << channel << ", ";
-		auto &subscriptions = m_channel_subscriptions[channel];
-		for(auto it = subscriptions.begin(); it != subscriptions.end(); ++it)
-		{
-			receiving_participants.insert(receiving_participants.end(), *it);
-		}
+		channels = dgi.read_uint8();
 
-		auto range = boost::icl::find(m_range_subscriptions, channel);
-		if(range != m_range_subscriptions.end())
+		// Route messages to participants
+		auto &recieve_log = m_log.spam();
+		recieve_log << "Recievers: ";
+		for(uint8_t i = 0; i < channels; ++i)
 		{
-			receiving_participants.insert(range->second.begin(), range->second.end());
+			channel_t channel = dgi.read_uint64();
+			recieve_log << channel << ", ";
+			auto &subscriptions = m_channel_subscriptions[channel];
+			for(auto it = subscriptions.begin(); it != subscriptions.end(); ++it)
+			{
+				receiving_participants.insert(receiving_participants.end(), *it);
+			}
+
+			auto range = boost::icl::find(m_range_subscriptions, channel);
+			if(range != m_range_subscriptions.end())
+			{
+				receiving_participants.insert(range->second.begin(), range->second.end());
+			}
 		}
+		recieve_log << std::endl;
 	}
-	recieve_log << std::endl;
+	catch(DatagramIteratorEOF &e)
+	{
+		// Log error with receivers output
+		m_log.error() << "Detected truncated datagram reading header from '" << p->m_name << "'." << std::endl;
+		return;
+	}
 
-	if (p)
+	if(p)
 	{
 		receiving_participants.erase(p);
 	}
 
 	for(auto it = receiving_participants.begin(); it != receiving_participants.end(); ++it)
 	{
-		DatagramIterator msg_dgi(dg, 1+channels*8);
-		(*it)->handle_datagram(dg, msg_dgi);
+		DatagramIterator msg_dgi(dg, 1 + channels * 8);
+		try
+		{
+			(*it)->handle_datagram(dg, msg_dgi);
+		}
+		catch(DatagramIteratorEOF &e)
+		{
+			// Log error with receivers output
+			m_log.error() << "Detected truncated datagram in handle_datagram for '" << (*it)->m_name << "'"
+			              " from participant '" << p->m_name << "' ." << std::endl;
+			return;
+		}
 	}
 
 	if(p && is_client)  // Send message upstream
@@ -142,7 +163,8 @@ void MessageDirector::handle_datagram(MDParticipantInterface *p, Datagram &dg)
 void MessageDirector::subscribe_channel(MDParticipantInterface* p, channel_t c)
 {
 	// Check if participant is already subscribed in a range
-	if(boost::icl::find(p->ranges(), c) == p->ranges().end()) {
+	if(boost::icl::find(p->ranges(), c) == p->ranges().end())
+	{
 		// If not, subscribe participant to channel
 		p->channels().insert(p->channels().end(), c);
 		m_channel_subscriptions[c].insert(m_channel_subscriptions[c].end(), p);
@@ -195,7 +217,8 @@ void MessageDirector::unsubscribe_channel(MDParticipantInterface* p, channel_t c
 	}
 
 	// Check if should unsubscribe upstream...
-	if(is_client) {
+	if(is_client)
+	{
 		// Check if there are any remaining single channel subscriptions
 		if(m_channel_subscriptions[c].size() > 0)
 		{
@@ -229,12 +252,12 @@ void MessageDirector::subscribe_range(MDParticipantInterface* p, channel_t lo, c
 	m_range_subscriptions += std::make_pair(interval, participant_set);
 
 	// Remove old subscriptions from participants where: [ range.low <= old_channel <= range.high ]
-	for (auto it = p->channels().begin(); it != p->channels().end();)
+	for(auto it = p->channels().begin(); it != p->channels().end();)
 	{
 		auto prev = it++;
 		channel_t c = *prev;
 
-		if (lo <= c && c <= hi)
+		if(lo <= c && c <= hi)
 		{
 			m_channel_subscriptions[c].erase(p);
 			p->channels().erase(prev);
@@ -245,12 +268,12 @@ void MessageDirector::subscribe_range(MDParticipantInterface* p, channel_t lo, c
 	if(is_client)
 	{
 		// Check how many intervals along that range are already subscribed
-		int new_intervals = 0, premade_intervals = 0;
+		uint64_t new_intervals = 0, premade_intervals = 0;
 		auto interval_range = m_range_subscriptions.equal_range(interval_t::closed(lo, hi));
 		for(auto it = interval_range.first; it != interval_range.second; ++it)
 		{
 			++new_intervals;
-			if (it->second.size() > 1)
+			if(it->second.size() > 1)
 			{
 				++premade_intervals;
 			}
@@ -287,12 +310,12 @@ void MessageDirector::unsubscribe_range(MDParticipantInterface *p, channel_t lo,
 	m_range_subscriptions -= std::make_pair(interval, participant_set);
 
 	// Remove old subscriptions from participants where: [ range.low <= old_channel <= range.high ]
-	for (auto it = p->channels().begin(); it != p->channels().end();)
+	for(auto it = p->channels().begin(); it != p->channels().end();)
 	{
 		auto prev = it++;
 		channel_t c = *prev;
 
-		if (lo <= c && c <= hi)
+		if(lo <= c && c <= hi)
 		{
 			m_channel_subscriptions[c].erase(p);
 			p->channels().erase(prev);
@@ -306,7 +329,7 @@ void MessageDirector::unsubscribe_range(MDParticipantInterface *p, channel_t lo,
 		std::list<interval_t> silent_intervals;
 
 		// If that was the last interval in m_range_subscriptions, remove it upstream
-		if (boost::icl::interval_count(m_range_subscriptions) == 0)
+		if(boost::icl::interval_count(m_range_subscriptions) == 0)
 		{
 			silent_intervals.insert(silent_intervals.end(), range_copy.begin()->first);
 		}
@@ -318,16 +341,20 @@ void MessageDirector::unsubscribe_range(MDParticipantInterface *p, channel_t lo,
 			{
 				// For the range we care about
 				// TODO: Read Boost::ICL to find a way to restrict the iterator to a range we care about
-				if(it->first.lower() <= hi && it->first.upper() >= lo) {
+				if(it->first.lower() <= hi && it->first.upper() >= lo)
+				{
 					// If an existing interval is empty it is silent
-					if (it->second.empty())
+					if(it->second.empty())
 					{
 						silent_intervals.insert(silent_intervals.end(), it->first);
 					}
-					if(next != m_range_subscriptions.end()) {
+					if(next != m_range_subscriptions.end())
+					{
 						// If there is room between intervals, that is a silent interval
-						if (next->first.lower() - it->first.upper() > 0) {
-							silent_intervals.insert(silent_intervals.end(), boost::icl::inner_complement(it->first, next->first));
+						if(next->first.lower() - it->first.upper() > 0)
+						{
+							silent_intervals.insert(silent_intervals.end(),
+							                        boost::icl::inner_complement(it->first, next->first));
 						}
 						++next;
 					}
@@ -339,15 +366,19 @@ void MessageDirector::unsubscribe_range(MDParticipantInterface *p, channel_t lo,
 		for(auto it = silent_intervals.begin(); it != silent_intervals.end(); ++it)
 		{
 			m_log.debug() << "Unsubscribing from upstream range: "
-				<< it->lower() << "-" << it->upper() << " " << int(it->bounds().bits()) << std::endl;
+			              << it->lower() << "-" << it->upper() << " " << int(it->bounds().bits()) << std::endl;
 			Datagram dg(CONTROL_REMOVE_RANGE);
 
 			channel_t lo = it->lower();
 			channel_t hi = it->upper();
 			if(!(it->bounds().bits() & BOOST_BINARY(10)))
+			{
 				lo += 1;
+			}
 			if(!(it->bounds().bits() & BOOST_BINARY(01)))
+			{
 				hi -= 1;
+			}
 
 			dg.add_uint64(lo);
 			dg.add_uint64(hi);
@@ -356,11 +387,12 @@ void MessageDirector::unsubscribe_range(MDParticipantInterface *p, channel_t lo,
 	}
 }
 
-MessageDirector::MessageDirector() : m_acceptor(NULL), m_initialized(false), is_client(false), m_log("msgdir", "Message Director")
+MessageDirector::MessageDirector() : m_acceptor(NULL), m_initialized(false), is_client(false),
+	m_log("msgdir", "Message Director")
 {
 	// Initialize m_range_susbcriptions with empty range
 	auto empty_set = std::set<MDParticipantInterface*>();
-	m_range_subscriptions = boost::icl::interval_map<channel_t, std::set<MDParticipantInterface*>>();
+	m_range_subscriptions = boost::icl::interval_map<channel_t, std::set<MDParticipantInterface*> >();
 	m_range_subscriptions += std::make_pair(interval_t::closed(0, ULLONG_MAX), empty_set);
 }
 
@@ -369,7 +401,7 @@ void MessageDirector::start_accept()
 	tcp::socket *socket = new tcp::socket(io_service);
 	tcp::endpoint peerEndpoint;
 	m_acceptor->async_accept(*socket, boost::bind(&MessageDirector::handle_accept,
-		this, socket, boost::asio::placeholders::error));
+	                         this, socket, boost::asio::placeholders::error));
 }
 
 void MessageDirector::handle_accept(tcp::socket *socket, const boost::system::error_code &ec)
@@ -388,9 +420,6 @@ void MessageDirector::add_participant(MDParticipantInterface* p)
 
 void MessageDirector::remove_participant(MDParticipantInterface* p)
 {
-	// Send out a post remove, if one exists
-	p->post_remove();
-
 	// Send out unsubscribe messages for indivually subscribed channels
 	auto channels = std::set<channel_t>(p->channels());
 	for(auto it = channels.begin(); it != channels.end(); ++it)
@@ -408,6 +437,13 @@ void MessageDirector::remove_participant(MDParticipantInterface* p)
 
 	// Stop tracking participant
 	m_participants.remove(p);
+
+	// Send out any post-remove messages the participant may have added.
+	// N.B. this is done last, because we don't want to send messages
+	// through the Director while a participant is being removed, as
+	// certain data structures may not have their invariants satisfied
+	// during that time.
+	p->post_remove();
 }
 
 void MessageDirector::network_datagram(Datagram &dg)

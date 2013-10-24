@@ -1,6 +1,6 @@
 cmake_minimum_required (VERSION 2.6)
 set_property (GLOBAL PROPERTY USE_FOLDERS ON)
-project (OOTP)
+project (Astron)
 
 if (WIN32)
 	add_definitions (-D_WIN32_WINDOWS)
@@ -34,6 +34,8 @@ endif()
 if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
 	set (YAMLCPP_LIBNAME "yaml-cpp" CACHE STRING "Name of YAML library")
 	set (CMAKE_CXX_FLAGS "-pthread")
+elseif (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+	set (YAMLCPP_LIBNAME "yaml-cpp" CACHE STRING "Name of YAML library")
 else ()
 	set (YAMLCPP_LIBNAME "libyaml-cppmd" CACHE STRING "Name of YAML library")
 	set (YAMLCPP_LIBNAME optimized ${YAMLCPP_LIBNAME} debug ${YAMLCPP_LIBNAME}d)
@@ -66,8 +68,8 @@ set (BUILD_TESTS CACHE BOOL "If set to true, test files will be compiled in")
 
 if(BUILD_TESTS)
 	set (TEST_FILES
-		src/tests/participant_test.cpp
-		src/tests/performance_test.cpp
+		src/tests/MDParticipantTest.cpp
+		src/tests/MDPerformanceTest.cpp
 	)
 endif()
 
@@ -81,18 +83,36 @@ if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
 	endif()
 endif()
 
-set (BUILD_DBSERVER ON CACHE BOOL "If on, stateserver will be built into binary")
+set (BUILD_DBSERVER ON CACHE BOOL "If on, Database Server will be built into binary")
 if(BUILD_DBSERVER)
 	set (DBSERVER_FILES
 		src/database/DatabaseServer.cpp
 		src/database/IDatabaseEngine.h
 		src/database/DBEngineFactory.h
 		src/database/DBEngineFactory.cpp
-		src/database/FSDBEngine.cpp
 	)
+
+	set (BUILD_DB_FILESYSTEM OFF CACHE BOOL "If on, will support a filesystem-based database")
+	if(BUILD_DB_FILESYSTEM)
+		set (DBSERVER_FILES
+			${DBSERVER_FILES}
+			src/database/FSDBEngine.cpp
+		)
+	endif()
+
+	set (BUILD_DB_YAML ON CACHE BOOL "If on, will support a YAML-based database (for development)")
+	if(BUILD_DB_YAML)
+		set (DBSERVER_FILES
+			${DBSERVER_FILES}
+			src/database/YAMLEngine.cpp
+		)
+	endif()
+else()
+	set (BUILD_DB_FILESYSTEM OFF)
+	set (BUILD_DB_YAML OFF)
 endif()
 
-set (BUILD_STATESERVER ON CACHE BOOL "If on, stateserver will be built into binary")
+set (BUILD_STATESERVER ON CACHE BOOL "If on, State Server will be built into binary")
 if(BUILD_STATESERVER)
 	set (STATESERVER_FILES
 		src/stateserver/StateServer.cpp
@@ -100,6 +120,19 @@ if(BUILD_STATESERVER)
 		src/stateserver/DistributedObject.cpp
 		src/stateserver/DistributedObject.h
 	)
+
+	set (BUILD_STATESERVER_DBSS ON CACHE BOOL "If on, the Database-State Server will be built into binary")
+	if(BUILD_STATESERVER_DBSS)
+		set(STATESERVER_FILES
+			${STATESERVER_FILES}
+			src/stateserver/DBStateServer.h
+			src/stateserver/DBStateServer.cpp
+			src/stateserver/LoadingObject.h
+			src/stateserver/LoadingObject.cpp
+		)
+	endif()
+else()
+	set(BUILD_STATESERVER_DBSS OFF)
 endif()
 
 set (BUILD_EVENTLOGGER ON CACHE BOOL "If on, Event Logger will be built into binary")
@@ -110,8 +143,22 @@ if(BUILD_EVENTLOGGER)
 	)
 endif()
 
+set (BUILD_CLIENTAGENT ON CACHE BOOL "If on, Client Agent will be built into binary")
+if(BUILD_CLIENTAGENT)
+	set (CLIENTAGENT_FILES
+		src/clientagent/Client.h
+		src/clientagent/Client.cpp
+		src/clientagent/ClientAgent.h
+		src/clientagent/ClientAgent.cpp
+		src/clientagent/ClientMessages.h
+		src/clientagent/ClientFactory.cpp
+		src/clientagent/ClientFactory.h
+		src/clientagent/AstronClient.cpp
+	)
+endif()
+
 include_directories (src)
-add_executable (openotpd
+add_executable (astrond
 	src/core/main.cpp 
 	src/core/config.cpp 
 	src/core/logger.cpp 
@@ -135,6 +182,7 @@ add_executable (openotpd
 	src/util/EventSender.h
 	${STATESERVER_FILES}
 	${EVENTLOGGER_FILES}
+	${CLIENTAGENT_FILES}
 	${TEST_FILES}
 	${DBSERVER_FILES}
 )
@@ -148,5 +196,5 @@ add_library (dcparser
 	src/dcparser/dcParser.cxx
 )
 
-add_dependencies (openotpd dcparser)
-target_link_libraries (openotpd dcparser ${YAMLCPP_LIBNAME} ${Boost_LIBRARIES})
+add_dependencies (astrond dcparser)
+target_link_libraries (astrond dcparser ${YAMLCPP_LIBNAME} ${Boost_LIBRARIES})

@@ -3,12 +3,16 @@
 
 import os.path
 
-test_dc = os.path.join(os.path.dirname(__file__), 'test.dc')
+test_dc = os.path.abspath(os.path.join(os.path.dirname(__file__), 'test.dc'))
 
 DistributedTestObject1 = 0
 DistributedTestObject2 = 1
 DistributedTestObject3 = 2
 DistributedTestObject4 = 3
+DistributedTestObject5 = 4
+UberDog1 = 5
+UberDog2 = 6
+DistributedClientTestObject = 7
 
 setRequired1 = 0
 setB1 = 1
@@ -31,5 +35,24 @@ setOne = 15
 setTwo = 16
 setThree = 17
 set123 = 18
+setRDbD5 = 19
+setFoo = 20
+
+request = 21
+response = 22
+
+foo = 23
+bar = 24
+
+setName = 25
+setColor = 26
+requestKill = 27
+sendMessage = 28
 
 setRequired1DefaultValue = 78
+
+# If you edit test.dc *AT ALL*, you will have to recalculate this.
+# If you don't know how, ask CFS.
+DC_HASH = 0x53c5b3b
+
+setRDbD5DefaultValue = 20
