@@ -37,6 +37,7 @@ function(composite_sources target sources_var)
   endif()
 
   if(NOT DEFINED COMPOSITE_OUTPUT_EXTENSION)
+    set(COMPOSITE_OUTPUT_EXTENSION "cpp")
   endif()
 
   if(NOT DEFINED COMPOSITE_GENERATOR)
@@ -80,13 +81,16 @@ function(composite_sources target sources_var)
           list(LENGTH composite_files index)
           math(EXPR index "1+${index}")
           set(composite_file "${CMAKE_CURRENT_BINARY_DIR}/${target}_composite${index}.${COMPOSITE_OUTPUT_EXTENSION}")
-          list(APPEND composite_files "${composite_file}")
 
           # Set HEADER_FILE_ONLY to prevent it from showing up in the
           # compiler command, but still show up in the IDE environment.
           set_source_files_properties(${composite_sources} PROPERTIES HEADER_FILE_ONLY ON)
 
-          # We'll interrogate the composite files, so exclude the original sources.
+
+          list(APPEND composite_files "${composite_file}")
+
+
+          # Exclude the original sources
           set_source_files_properties(${composite_sources} PROPERTIES WRAP_EXCLUDE YES)
 
           # Finally, add the target that generates the composite file.
@@ -104,3 +108,4 @@ function(composite_sources target sources_var)
       endif()
     endif()
   endwhile()
+endfunction()

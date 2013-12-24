@@ -305,6 +305,22 @@ set(UTIL_FILES
 	src/util/EventSender.h
 )
 
+# Handle unity builds
+option(DO_UNITY_BUILD "If on, increases compile speed dramatically by grouping sources.")
+if(DO_UNITY_BUILD)
+	include(CompositeSources)
+	composite_sources(core CORE_FILES)
+	composite_sources(mesgdirector MESSAGEDIRECTOR_FILES)
+	composite_sources(util UTIL_FILES)
+	composite_sources(stateserver STATESERVER_FILES)
+	composite_sources(eventlogger EVENTLOGGER_FILES)
+	composite_sources(clientagent CLIENTAGENT_FILES)
+	composite_sources(dbserver DBSERVER_FILES)
+	composite_sources(test TEST_FILES)
+endif()
+
+message("${CORE_FILES}")
+
 include_directories(src)
 add_test(messagedirector ${CMAKE_SOURCE_DIR}/test/test_messagedirector.py)
 add_executable(astrond
@@ -314,8 +330,8 @@ add_executable(astrond
 	${STATESERVER_FILES}
 	${EVENTLOGGER_FILES}
 	${CLIENTAGENT_FILES}
-	${TEST_FILES}
 	${DBSERVER_FILES}
+	${TEST_FILES}
 )
 
 ### Setup source groups ###
